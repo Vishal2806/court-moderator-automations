@@ -3,38 +3,37 @@ import { Link } from 'react-router-dom';
 
 const HomePage = () => {
   return (
-    <div className="dashboard-page">
-      <section className="hero-card">
-        <div>
-          <h1>Manage Court Hearing Records</h1>
+    <div className="home-page">
+      <div className="home-header">
+        <div className="home-emblem">⚖</div>
+        <h1>Court Hearing Records</h1>
+        <p className="home-sub">
+          Central registry for advocate and victim hearing records.
+          Select a section below to add or review entries.
+        </p>
+      </div>
+
+      <div className="home-cards">
+        <div className="home-card">
+          <div className="card-icon">📋</div>
+          <h2>Advocate Records</h2>
           <p>
-            Add and review advocate and victim hearing details in one user-friendly dashboard.
-            Use the navigation links to switch between advocate and victim forms, then see the latest records below.
+            Submit and review advocate hearing entries — case number, court hall,
+            counsel details, and supporting documents.
           </p>
+          <Link className="card-btn" to="/advocate">Open Advocate Register →</Link>
         </div>
-      </section>
 
-      <section className="dashboard-grid">
-        <article className="dashboard-card">
-          <h2>Advocate Form</h2>
+        <div className="home-card">
+          <div className="card-icon">📁</div>
+          <h2>Victim Records</h2>
           <p>
-            Submit new advocate hearing records with case details, court hall, counsel information and remarks.
+            Submit and review victim hearing entries — party name, court hall,
+            counsel details, and supporting documents.
           </p>
-          <Link className="btn-link" to="/advocate">
-            Go to Advocate
-          </Link>
-        </article>
-
-        <article className="dashboard-card">
-          <h2>Victim Form</h2>
-          <p>
-            Add victim hearing records quickly and keep track of the latest entries directly from the UI.
-          </p>
-          <Link className="btn-link" to="/victim">
-            Go to Victim
-          </Link>
-        </article>
-      </section>
+          <Link className="card-btn" to="/victim">Open Victim Register →</Link>
+        </div>
+      </div>
     </div>
   );
 };

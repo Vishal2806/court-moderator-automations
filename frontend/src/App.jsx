@@ -3,36 +3,47 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react
 import AdvocatePage from './pages/AdvocatePage';
 import VictimPage from './pages/VictimPage';
 import HomePage from './pages/HomePage';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 const App = () => {
   return (
     <Router>
-      <div className="app">
-        <header className="header">
-          <h1>Court Moderator Automations</h1>
-        </header>
-        <nav className="nav">
-          <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-            Home
-          </NavLink>
-          <NavLink to="/advocate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-            Advocate
-          </NavLink>
-          <NavLink to="/victim" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-            Victim
-          </NavLink>
+      <div className="app-shell">
+        <nav className="top-nav">
+          <NavLink className="nav-brand" to="/">⚖ Court Hearing Records</NavLink>
+          <ul className="nav-links">
+            <li>
+              <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>
+                Home
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/advocate" className={({ isActive }) => isActive ? 'active' : ''}>
+                Advocates
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/victim" className={({ isActive }) => isActive ? 'active' : ''}>
+                Victims
+              </NavLink>
+            </li>
+          </ul>
         </nav>
-        <main className="main">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/advocate" element={<AdvocatePage />} />
-            <Route path="/victim" element={<VictimPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+
+        <main className="main-content">
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/advocate" element={<AdvocatePage />} />
+              <Route path="/victim" element={<VictimPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
-        <footer className="footer">
-          <p>&copy; 2026 Court Moderator System. All rights reserved.</p>
+
+        <footer className="app-footer">
+          High Court of Delhi &mdash; VC Hearing Registry &copy; 2026
         </footer>
       </div>
     </Router>
