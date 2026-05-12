@@ -8,18 +8,32 @@ const normalizeRow = (row, keys) => {
   const normalizedRow = {};
 
   Object.keys(row).forEach((key) => {
-    normalizedRow[key.toLowerCase().trim()] = row[key];
+    const cleanKey = String(key)
+      .replace(/\n/g, " ")
+      .replace(/\r/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+    normalizedRow[cleanKey] = row[key];
   });
 
   for (const key of keys) {
-    const normalizedKey = key.toLowerCase().trim();
+    const cleanKey = String(key)
+      .replace(/\n/g, " ")
+      .replace(/\r/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+    const value = normalizedRow[cleanKey];
 
     if (
-      normalizedRow[normalizedKey] !== undefined &&
-      normalizedRow[normalizedKey] !== null &&
-      String(normalizedRow[normalizedKey]).trim() !== ""
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== ""
     ) {
-      return normalizedRow[normalizedKey];
+      return value;
     }
   }
 
@@ -207,10 +221,8 @@ export const getVictims = async (req, res) => {
 // ==========================
 // Bulk Upload Victims
 // ==========================
-export const bulkUploadVictims = async (
-  req,
-  res
-) => {
+export const bulkUploadVictims = async (req, res) => {
+
   if (!req.file) {
     return res.status(400).json({
       success: false,
@@ -219,29 +231,140 @@ export const bulkUploadVictims = async (
   }
 
   try {
-    // Read Excel File
-    const workbook = XLSX.read(
-      req.file.buffer,
-      {
-        type: "buffer",
-      }
-    );
+
+    // ==========================
+    // Read Excel
+    // ==========================
+    const workbook = XLSX.read(req.file.buffer, {
+      type: "buffer",
+    });
 
     const sheetName = workbook.SheetNames[0];
 
-    const worksheet =
-      workbook.Sheets[sheetName];
+    const worksheet = workbook.Sheets[sheetName];
 
-    // Read Data
-    const data = XLSX.utils.sheet_to_json(
+    // ==========================
+    // Read Sheet As Array
+    // ==========================
+    const rows = XLSX.utils.sheet_to_json(
       worksheet,
       {
+        header: 1,
         defval: "",
-        range: 3,
       }
     );
 
+    // ==========================
+    // Remove Empty Rows
+    // ==========================
+    const filteredRows = rows.filter((row) =>
+      row.some(
+        (cell) =>
+          String(cell).trim() !== ""
+      )
+    );
+
+    if (filteredRows.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: "Excel file is empty",
+      });
+    }
+
+    // ==========================
+    // Find Header Row
+    // ==========================
+    let headerRowIndex = 0;
+
+    for (let i = 0; i < filteredRows.length; i++) {
+
+      const rowString = filteredRows[i]
+        .join(" ")
+        .toLowerCase();
+
+      if (
+        rowString.includes("case") &&
+        rowString.includes("court")
+      ) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    const headers =
+      filteredRows[headerRowIndex];
+
+    const dataRows =
+      filteredRows.slice(headerRowIndex + 1);
+
+    // ==========================
+    // Find Column Indexes
+    // ==========================
+    const getIndex = (possibleNames) => {
+
+      return headers.findIndex((header) => {
+
+        const cleanHeader = String(header)
+          .replace(/\n/g, " ")
+          .replace(/\r/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
+
+        return possibleNames.some((name) =>
+          cleanHeader.includes(
+            name.toLowerCase()
+          )
+        );
+      });
+    };
+
+    const indexes = {
+
+      serial_no: getIndex([
+        "s.n",
+        "serial",
+      ]),
+
+      hearing_date: getIndex([
+        "date",
+      ]),
+
+      case_no: getIndex([
+        "case no",
+        "case number",
+      ]),
+
+      court_hall_no: getIndex([
+        "court hall",
+        "hall no",
+      ]),
+
+      party_name: getIndex([
+        "party name",
+        "petitonar name",
+        "petitioner name",
+      ]),
+
+      counsel_name: getIndex([
+        "counsel name through vc",
+        "counsel name",
+      ]),
+
+      technical_person: getIndex([
+        "technical person",
+      ]),
+
+      remarks: getIndex([
+        "remarks",
+      ]),
+    };
+
+    console.log("Detected Indexes:", indexes);
+
+    // ==========================
     // Get Max Serial
+    // ==========================
     const maxResult = await pool.query(
       "SELECT MAX(serial_no) as max_serial FROM victims"
     );
@@ -252,201 +375,190 @@ export const bulkUploadVictims = async (
     const inserted = [];
     const skipped = [];
 
-    for (const [index, row] of data.entries()) {
-      // ==========================
-      // Hearing Date
-      // ==========================
-      let hearing_date_value = normalizeRow(
-        row,
-        [
-          "hearing_date",
-          "Hearing Date",
-          "Date",
-          "date",
-        ]
-      );
+    // ==========================
+    // Process Rows
+    // ==========================
+    for (const [index, row] of dataRows.entries()) {
 
-      // Excel numeric date
-      if (
-        typeof hearing_date_value === "number"
-      ) {
-        const excelDate =
-          XLSX.SSF.parse_date_code(
-            hearing_date_value
-          );
+      try {
 
-        if (excelDate) {
-          hearing_date_value = `${excelDate.y}-${String(
-            excelDate.m
-          ).padStart(2, "0")}-${String(
-            excelDate.d
-          ).padStart(2, "0")}`;
-        } else {
-          hearing_date_value = null;
+        // ==========================
+        // Date Formatting
+        // ==========================
+        let hearing_date_value =
+          row[indexes.hearing_date];
+
+        if (
+          typeof hearing_date_value ===
+          "number"
+        ) {
+
+          const excelDate =
+            XLSX.SSF.parse_date_code(
+              hearing_date_value
+            );
+
+          if (excelDate) {
+
+            hearing_date_value =
+              `${excelDate.y}-${String(
+                excelDate.m
+              ).padStart(2, "0")}-${String(
+                excelDate.d
+              ).padStart(2, "0")}`;
+          }
         }
-      }
 
-      // Empty date fallback
-      if (
-        !hearing_date_value ||
-        String(
-          hearing_date_value
-        ).trim() === ""
-      ) {
-        hearing_date_value = new Date()
-          .toISOString()
-          .slice(0, 10);
-      }
+        // DD/MM/YYYY support
+        if (
+          typeof hearing_date_value ===
+          "string"
+        ) {
 
-      // ==========================
-      // Other Fields
-      // ==========================
-      const case_no_value = normalizeRow(
-        row,
-        [
-          "case_no",
-          "Case No",
-          "Case Number",
-          "case number",
-        ]
-      );
+          const parts =
+            hearing_date_value.split("/");
 
-      const court_hall_no_value =
-        normalizeRow(row, [
-          "court_hall_no",
-          "Court Hall No",
-          "Hall No",
-          "hall_no",
-          "hall",
-        ]);
+          if (parts.length === 3) {
 
-      const party_name_value = normalizeRow(
-        row,
-        [
-          "party_name",
-          "Party Name",
-          "Party",
-        ]
-      );
+            hearing_date_value =
+              `${parts[2]}-${parts[1].padStart(
+                2,
+                "0"
+              )}-${parts[0].padStart(
+                2,
+                "0"
+              )}`;
+          }
+        }
 
-      const counsel_name_value =
-        normalizeRow(row, [
-          "counsel_name_through_vc",
-          "Counsel Name Through VC",
-          "Counsel Name",
-        ]);
+        // Fallback
+        if (
+          !hearing_date_value ||
+          String(
+            hearing_date_value
+          ).trim() === ""
+        ) {
 
-      const technical_person_value =
-        normalizeRow(row, [
-          "technical_person",
-          "Technical Person",
-        ]);
+          hearing_date_value =
+            new Date()
+              .toISOString()
+              .slice(0, 10);
+        }
 
-      const remarks_value = normalizeRow(
-        row,
-        ["remarks", "Remarks"]
-      );
+        // ==========================
+        // Read Values
+        // ==========================
+        const case_no_value =
+          row[indexes.case_no];
 
-      const uploaded_file_value =
-        normalizeRow(row, [
-          "uploaded_file",
-          "Uploaded File",
-          "File",
-        ]);
+        const court_hall_no_value =
+          row[indexes.court_hall_no];
 
-      // ==========================
-      // Debug Logs
-      // ==========================
-      console.log("Processing Row:", row);
+        const party_name_value =
+          row[indexes.party_name];
 
-      console.log({
-        hearing_date_value,
-        case_no_value,
-        court_hall_no_value,
-        party_name_value,
-        counsel_name_value,
-        technical_person_value,
-      });
+        const counsel_name_value =
+          row[indexes.counsel_name];
 
-      // ==========================
-      // Skip Invalid Rows
-      // ==========================
-      if (
-        !case_no_value ||
-        !court_hall_no_value ||
-        !party_name_value ||
-        !counsel_name_value ||
-        !technical_person_value
-      ) {
-        skipped.push({
-          row: index + 1,
-          rowData: row,
+        const technical_person_value =
+          row[indexes.technical_person];
+
+        const remarks_value =
+          row[indexes.remarks];
+
+        console.log({
+          hearing_date_value,
+          case_no_value,
+          court_hall_no_value,
+          party_name_value,
+          counsel_name_value,
+          technical_person_value,
         });
 
-        continue;
+        // ==========================
+        // Skip Invalid Rows
+        // ==========================
+        if (
+          !case_no_value ||
+          !court_hall_no_value ||
+          !party_name_value
+        ) {
+
+          skipped.push({
+            row: index + 1,
+            reason: "Missing required fields",
+          });
+
+          continue;
+        }
+
+        // ==========================
+        // Insert Query
+        // ==========================
+        await pool.query(
+          `
+          INSERT INTO victims (
+            serial_no,
+            hearing_date,
+            case_no,
+            court_hall_no,
+            party_name,
+            counsel_name_through_vc,
+            technical_person,
+            remarks
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          `,
+          [
+            serial_no++,
+            hearing_date_value,
+            String(case_no_value).trim(),
+            String(court_hall_no_value).trim(),
+            String(party_name_value).trim(),
+            counsel_name_value
+              ? String(
+                  counsel_name_value
+                ).trim()
+              : null,
+            technical_person_value
+              ? String(
+                  technical_person_value
+                ).trim()
+              : null,
+            remarks_value
+              ? String(
+                  remarks_value
+                ).trim()
+              : null,
+          ]
+        );
+
+        inserted.push(index + 1);
+
+      } catch (err) {
+
+        console.log(err);
+
+        skipped.push({
+          row: index + 1,
+          reason: err.message,
+        });
       }
-
-      // ==========================
-      // Insert Query
-      // ==========================
-      const query = `
-        INSERT INTO victims (
-          serial_no,
-          hearing_date,
-          case_no,
-          court_hall_no,
-          party_name,
-          counsel_name_through_vc,
-          technical_person,
-          uploaded_file,
-          remarks
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      `;
-
-      const values = [
-        serial_no++,
-        hearing_date_value,
-        case_no_value,
-        court_hall_no_value,
-        party_name_value,
-        counsel_name_value,
-        technical_person_value,
-
-        req.file
-          ? `uploads/${req.file.filename}`
-          : uploaded_file_value || null,
-
-        remarks_value || null,
-      ];
-
-      await pool.query(query, values);
-
-      inserted.push({
-        serial_no: serial_no - 1,
-        hearing_date: hearing_date_value,
-      });
     }
 
+    // ==========================
+    // Response
+    // ==========================
     res.status(201).json({
       success: true,
-
-      message: `Bulk uploaded ${inserted.length} victim records${
-        skipped.length > 0
-          ? `, skipped ${skipped.length} rows`
-          : ""
-      }`,
-
       inserted: inserted.length,
-
       skipped: skipped.length,
-
-      ...(skipped.length > 0 && {
-        skippedDetails: skipped.slice(0, 10),
-      }),
+      skippedDetails: skipped,
     });
+
   } catch (error) {
-    console.error(error);
+
+    console.log(error);
 
     res.status(500).json({
       success: false,
