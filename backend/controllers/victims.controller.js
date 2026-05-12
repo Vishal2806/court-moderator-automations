@@ -1,27 +1,76 @@
 import pool from "../config/db.js";
+import XLSX from "xlsx";
 
+// ==========================
+// Normalize Excel Headers
+// ==========================
+const normalizeRow = (row, keys) => {
+  const normalizedRow = {};
+
+  Object.keys(row).forEach((key) => {
+    normalizedRow[key.toLowerCase().trim()] = row[key];
+  });
+
+  for (const key of keys) {
+    const normalizedKey = key.toLowerCase().trim();
+
+    if (
+      normalizedRow[normalizedKey] !== undefined &&
+      normalizedRow[normalizedKey] !== null &&
+      String(normalizedRow[normalizedKey]).trim() !== ""
+    ) {
+      return normalizedRow[normalizedKey];
+    }
+  }
+
+  return undefined;
+};
+
+// ==========================
+// Upload Single Victim
+// ==========================
 export const uploadVictim = async (req, res) => {
-    try {
+  try {
+    const {
+      hearing_date,
+      case_no,
+      court_hall_no,
+      party_name,
+      counsel_name_through_vc,
+      technical_person,
+      remarks,
+    } = req.body;
 
-        const {
-            case_no,
-            court_hall_no,
-            party_name,
-            counsel_name_through_vc,
-            technical_person,
-            uploaded_file,
-            remarks
-        } = req.body;
+    const uploaded_file = req.file
+      ? `uploads/${req.file.filename}`
+      : null;
 
-        // Get max serial_no
-        const maxResult = await pool.query("SELECT MAX(serial_no) as max_serial FROM victims");
-        const serial_no = (maxResult.rows[0].max_serial || 0) + 1;
+    if (
+      !case_no ||
+      !court_hall_no ||
+      !party_name ||
+      !counsel_name_through_vc ||
+      !technical_person
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required victim fields",
+      });
+    }
 
-        // Current date
-        const hearing_date = new Date().toISOString().slice(0, 10);
+    const maxResult = await pool.query(
+      "SELECT MAX(serial_no) as max_serial FROM victims"
+    );
 
-        const result = await pool.query(
-            `
+    const serial_no =
+      (maxResult.rows[0].max_serial || 0) + 1;
+
+    const hearing_date_value =
+      hearing_date ||
+      new Date().toISOString().slice(0, 10);
+
+    const result = await pool.query(
+      `
       INSERT INTO victims (
         serial_no,
         hearing_date,
@@ -36,49 +85,372 @@ export const uploadVictim = async (req, res) => {
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
       `,
-            [
-                serial_no,
-                hearing_date,
-                case_no,
-                court_hall_no,
-                party_name,
-                counsel_name_through_vc,
-                technical_person,
-                uploaded_file,
-                remarks
-            ]
-        );
+      [
+        serial_no,
+        hearing_date_value,
+        case_no,
+        court_hall_no,
+        party_name,
+        counsel_name_through_vc,
+        technical_person,
+        uploaded_file,
+        remarks || null,
+      ]
+    );
 
-        res.status(201).json({
-            success: true,
-            data: result.rows[0]
-        });
-
-    } catch (error) {
-
-        console.log(error.message);
-
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-
-};
-export const getVictims = async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM victims ORDER BY serial_no DESC");
-    res.json({
+    res.status(201).json({
       success: true,
-      victims: result.rows
+      data: result.rows[0],
     });
   } catch (error) {
-    console.error(error);
+    console.log(error.message);
+
     res.status(500).json({
       success: false,
       error: error.message,
-    });     
-    }    
-    
+    });
+  }
 };
 
+// ==========================
+// Get Victims
+// ==========================
+export const getVictims = async (req, res) => {
+  try {
+    const page =
+      parseInt(req.query.page, 10) || 1;
+
+    const limit =
+      parseInt(req.query.limit, 10) || 10;
+
+    const offset = (page - 1) * limit;
+
+    const {
+      date,
+      case_no,
+      court_hall_no,
+    } = req.query;
+
+    let whereClause = "";
+
+    const values = [];
+
+    let paramIndex = 1;
+
+    if (date) {
+      whereClause += ` AND hearing_date = $${paramIndex++}`;
+
+      values.push(date);
+    }
+
+    if (case_no) {
+      whereClause += ` AND case_no ILIKE $${paramIndex++}`;
+
+      values.push(`%${case_no}%`);
+    }
+
+    if (court_hall_no) {
+      whereClause += ` AND court_hall_no ILIKE $${paramIndex++}`;
+
+      values.push(`%${court_hall_no}%`);
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM victims
+      WHERE 1=1 ${whereClause}
+    `;
+
+    const countResult = await pool.query(
+      countQuery,
+      values
+    );
+
+    const total = parseInt(
+      countResult.rows[0].total,
+      10
+    );
+
+    const resultQuery = `
+      SELECT *
+      FROM victims
+      WHERE 1=1 ${whereClause}
+      ORDER BY serial_no DESC
+      LIMIT $${paramIndex++}
+      OFFSET $${paramIndex++}
+    `;
+
+    values.push(limit, offset);
+
+    const result = await pool.query(
+      resultQuery,
+      values
+    );
+
+    res.json({
+      success: true,
+      victims: result.rows,
+      total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// ==========================
+// Bulk Upload Victims
+// ==========================
+export const bulkUploadVictims = async (
+  req,
+  res
+) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      error: "No file uploaded",
+    });
+  }
+
+  try {
+    // Read Excel File
+    const workbook = XLSX.read(
+      req.file.buffer,
+      {
+        type: "buffer",
+      }
+    );
+
+    const sheetName = workbook.SheetNames[0];
+
+    const worksheet =
+      workbook.Sheets[sheetName];
+
+    // Read Data
+    const data = XLSX.utils.sheet_to_json(
+      worksheet,
+      {
+        defval: "",
+        range: 3,
+      }
+    );
+
+    // Get Max Serial
+    const maxResult = await pool.query(
+      "SELECT MAX(serial_no) as max_serial FROM victims"
+    );
+
+    let serial_no =
+      (maxResult.rows[0].max_serial || 0) + 1;
+
+    const inserted = [];
+    const skipped = [];
+
+    for (const [index, row] of data.entries()) {
+      // ==========================
+      // Hearing Date
+      // ==========================
+      let hearing_date_value = normalizeRow(
+        row,
+        [
+          "hearing_date",
+          "Hearing Date",
+          "Date",
+          "date",
+        ]
+      );
+
+      // Excel numeric date
+      if (
+        typeof hearing_date_value === "number"
+      ) {
+        const excelDate =
+          XLSX.SSF.parse_date_code(
+            hearing_date_value
+          );
+
+        if (excelDate) {
+          hearing_date_value = `${excelDate.y}-${String(
+            excelDate.m
+          ).padStart(2, "0")}-${String(
+            excelDate.d
+          ).padStart(2, "0")}`;
+        } else {
+          hearing_date_value = null;
+        }
+      }
+
+      // Empty date fallback
+      if (
+        !hearing_date_value ||
+        String(
+          hearing_date_value
+        ).trim() === ""
+      ) {
+        hearing_date_value = new Date()
+          .toISOString()
+          .slice(0, 10);
+      }
+
+      // ==========================
+      // Other Fields
+      // ==========================
+      const case_no_value = normalizeRow(
+        row,
+        [
+          "case_no",
+          "Case No",
+          "Case Number",
+          "case number",
+        ]
+      );
+
+      const court_hall_no_value =
+        normalizeRow(row, [
+          "court_hall_no",
+          "Court Hall No",
+          "Hall No",
+          "hall_no",
+          "hall",
+        ]);
+
+      const party_name_value = normalizeRow(
+        row,
+        [
+          "party_name",
+          "Party Name",
+          "Party",
+        ]
+      );
+
+      const counsel_name_value =
+        normalizeRow(row, [
+          "counsel_name_through_vc",
+          "Counsel Name Through VC",
+          "Counsel Name",
+        ]);
+
+      const technical_person_value =
+        normalizeRow(row, [
+          "technical_person",
+          "Technical Person",
+        ]);
+
+      const remarks_value = normalizeRow(
+        row,
+        ["remarks", "Remarks"]
+      );
+
+      const uploaded_file_value =
+        normalizeRow(row, [
+          "uploaded_file",
+          "Uploaded File",
+          "File",
+        ]);
+
+      // ==========================
+      // Debug Logs
+      // ==========================
+      console.log("Processing Row:", row);
+
+      console.log({
+        hearing_date_value,
+        case_no_value,
+        court_hall_no_value,
+        party_name_value,
+        counsel_name_value,
+        technical_person_value,
+      });
+
+      // ==========================
+      // Skip Invalid Rows
+      // ==========================
+      if (
+        !case_no_value ||
+        !court_hall_no_value ||
+        !party_name_value ||
+        !counsel_name_value ||
+        !technical_person_value
+      ) {
+        skipped.push({
+          row: index + 1,
+          rowData: row,
+        });
+
+        continue;
+      }
+
+      // ==========================
+      // Insert Query
+      // ==========================
+      const query = `
+        INSERT INTO victims (
+          serial_no,
+          hearing_date,
+          case_no,
+          court_hall_no,
+          party_name,
+          counsel_name_through_vc,
+          technical_person,
+          uploaded_file,
+          remarks
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `;
+
+      const values = [
+        serial_no++,
+        hearing_date_value,
+        case_no_value,
+        court_hall_no_value,
+        party_name_value,
+        counsel_name_value,
+        technical_person_value,
+
+        req.file
+          ? `uploads/${req.file.filename}`
+          : uploaded_file_value || null,
+
+        remarks_value || null,
+      ];
+
+      await pool.query(query, values);
+
+      inserted.push({
+        serial_no: serial_no - 1,
+        hearing_date: hearing_date_value,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+
+      message: `Bulk uploaded ${inserted.length} victim records${
+        skipped.length > 0
+          ? `, skipped ${skipped.length} rows`
+          : ""
+      }`,
+
+      inserted: inserted.length,
+
+      skipped: skipped.length,
+
+      ...(skipped.length > 0 && {
+        skippedDetails: skipped.slice(0, 10),
+      }),
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};

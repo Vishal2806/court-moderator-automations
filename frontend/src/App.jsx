@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import AdvocatePage from './pages/AdvocatePage';
 import VictimPage from './pages/VictimPage';
+import HomePage from './pages/HomePage';
 import './index.css';
 
 const App = () => {
@@ -12,12 +13,22 @@ const App = () => {
           <h1>Court Moderator Automations</h1>
         </header>
         <nav className="nav">
-          <Link to="/advocate">Advocate</Link> | <Link to="/victim">Victim</Link>
+          <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+            Home
+          </NavLink>
+          <NavLink to="/advocate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+            Advocate
+          </NavLink>
+          <NavLink to="/victim" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+            Victim
+          </NavLink>
         </nav>
         <main className="main">
           <Routes>
+            <Route path="/" element={<HomePage />} />
             <Route path="/advocate" element={<AdvocatePage />} />
             <Route path="/victim" element={<VictimPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         <footer className="footer">
