@@ -6,17 +6,17 @@ const COURT_HALLS = [
   ...Array.from({ length: 21 }, (_, i) => ({ value: `Hall-${i + 1}`, label: `Hall-${i + 1}` }))
 ];
 
-const emptyForm = {
-  hearing_date: '',
-  case_no: '',
-  court_hall_no: '',
-  party_name: '',
-  counsel_name_through_vc: '',
-  technical_person: '',
-  remarks: ''
-};
-
 const VictimPage = () => {
+  const today = new Date().toISOString().split('T')[0];
+  const emptyForm = {
+    hearing_date: today,
+    case_no: '',
+    court_hall_no: '',
+    party_name: '',
+    counsel_name_through_vc: '',
+    technical_person: '',
+    remarks: ''
+  };
   const [tab, setTab] = useState('add');
   const [formData, setFormData] = useState(emptyForm);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -62,7 +62,6 @@ const VictimPage = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!selectedFile) { alert('Please choose a file before submitting.'); return; }
     setSubmitLoading(true);
     setSubmitMsg('');
     const data = new FormData();
@@ -138,7 +137,7 @@ const VictimPage = () => {
           {submitMsg.startsWith('error:') && (
             <div className="msg-bar error">Error: {submitMsg.slice(6)}</div>
           )}
-          <form onSubmit={handleSubmit} className="entry-form">
+          <form onSubmit={handleSubmit} className="entry-form" noValidate>
             <div className="form-row two-col">
               <div className="field">
                 <label>Hearing Date <span className="req">*</span></label>
@@ -164,7 +163,7 @@ const VictimPage = () => {
             </div>
             <div className="form-row two-col">
               <div className="field">
-                <label>Counsel Name (Through VC) <span className="req">*</span></label>
+                <label>Counsel DLSA <span className="req">*</span></label>
                 <input type="text" name="counsel_name_through_vc" value={formData.counsel_name_through_vc} onChange={handleChange} placeholder="Advocate name" required />
               </div>
               <div className="field">
@@ -180,8 +179,8 @@ const VictimPage = () => {
             </div>
             <div className="form-row">
               <div className="field">
-                <label>Attach Document <span className="req">*</span></label>
-                <input type="file" name="uploaded_file" onChange={e => setSelectedFile(e.target.files[0] || null)} ref={fileInputRef} required />
+                <label>Attach Document</label>
+                <input type="file" name="uploaded_file" onChange={e => setSelectedFile(e.target.files[0] || null)} ref={fileInputRef} />
                 {selectedFile && <span className="file-hint">✓ {selectedFile.name}</span>}
               </div>
             </div>

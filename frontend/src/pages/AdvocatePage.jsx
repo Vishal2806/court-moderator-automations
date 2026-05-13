@@ -6,17 +6,17 @@ const COURT_HALLS = [
   ...Array.from({ length: 21 }, (_, i) => ({ value: `Hall-${i + 1}`, label: `Hall-${i + 1}` }))
 ];
 
-const emptyForm = {
-  hearing_date: '',
-  case_no: '',
-  court_hall_no: '',
-  petitioner_name: '',
-  counsel_name_through_vc: '',
-  technical_person: '',
-  remarks: ''
-};
-
 const AdvocatePage = () => {
+  const today = new Date().toISOString().split('T')[0];
+  const emptyForm = {
+    hearing_date: today,
+    case_no: '',
+    court_hall_no: '',
+    petitioner_name: '',
+    counsel_name_through_vc: '',
+    technical_person: '',
+    remarks: ''
+  };
   const [tab, setTab] = useState('add'); // 'add' | 'records' | 'import'
   const [formData, setFormData] = useState(emptyForm);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -62,7 +62,6 @@ const AdvocatePage = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!selectedFile) { alert('Please choose a file before submitting.'); return; }
     setSubmitLoading(true);
     setSubmitMsg('');
     const data = new FormData();
@@ -138,7 +137,7 @@ const AdvocatePage = () => {
           {submitMsg.startsWith('error:') && (
             <div className="msg-bar error">Error: {submitMsg.slice(6)}</div>
           )}
-          <form onSubmit={handleSubmit} className="entry-form">
+          <form onSubmit={handleSubmit} className="entry-form" noValidate>
             <div className="form-row two-col">
               <div className="field">
                 <label>Hearing Date <span className="req">*</span></label>
@@ -180,8 +179,8 @@ const AdvocatePage = () => {
             </div>
             <div className="form-row">
               <div className="field">
-                <label>Attach Document <span className="req">*</span></label>
-                <input type="file" name="uploaded_file" onChange={e => setSelectedFile(e.target.files[0] || null)} ref={fileInputRef} required />
+                <label>Attach Document</label>
+                <input type="file" name="uploaded_file" onChange={e => setSelectedFile(e.target.files[0] || null)} ref={fileInputRef} />
                 {selectedFile && <span className="file-hint">✓ {selectedFile.name}</span>}
               </div>
             </div>
