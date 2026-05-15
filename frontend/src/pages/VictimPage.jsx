@@ -163,7 +163,7 @@ const VictimPage = () => {
             </div>
             <div className="form-row two-col">
               <div className="field">
-                <label>Counsel DLSA <span className="req">*</span></label>
+                <label>Consern DLSA <span className="req">*</span></label>
                 <input type="text" name="counsel_name_through_vc" value={formData.counsel_name_through_vc} onChange={handleChange} placeholder="Advocate name" required />
               </div>
               <div className="field">
