@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
 import axios from "axios";
 
 const AuthContext = createContext();
@@ -40,12 +45,35 @@ export const AuthProvider = ({ children }) => {
     return authUser;
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    delete axios.defaults.headers.common.Authorization;
-    localStorage.removeItem(STORAGE_KEY);
+const logout = () => {
+  setUser(null);
+  setToken(null);
+
+  delete axios.defaults.headers.common.Authorization;
+
+  localStorage.removeItem(STORAGE_KEY);
+
+  window.location.href = "/login";
+};
+useEffect(() => {
+  const interceptor =
+    axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          logout();
+        }
+
+        return Promise.reject(error);
+      }
+    );
+
+  return () => {
+    axios.interceptors.response.eject(
+      interceptor
+    );
   };
+}, []);
 
   const isAuthenticated = Boolean(user && token);
 
