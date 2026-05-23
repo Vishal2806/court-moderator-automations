@@ -50,7 +50,7 @@ const App = () => {
           </main>
 
           <footer className="app-footer">
-            High Court of Delhi &mdash; VC Hearing Registry &copy; 2026
+            High Court of Chhattisgarh &mdash; VC Hearing Registry &copy; 2026
           </footer>
         </div>
       </Router>

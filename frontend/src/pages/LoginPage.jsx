@@ -49,7 +49,7 @@ const LoginPage = () => {
         {/* Emblem / branding */}
         <div className="login-emblem">⚖</div>
         <h1 className="login-title">Court Hearing Records</h1>
-        <p className="login-subtitle">High Court of Delhi &mdash; VC Hearing Registry</p>
+        <p className="login-subtitle">High Court of Chhattisgarh &mdash; VC Hearing Registry</p>
 
         <div className="login-divider" />
 

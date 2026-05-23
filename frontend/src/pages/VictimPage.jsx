@@ -109,7 +109,7 @@ const VictimPage = () => {
       <div className="register-header">
         <div>
           <h1 className="register-title">Victim Register</h1>
-          <p className="register-meta">High Court of Delhi &mdash; VC Hearing Records</p>
+          <p className="register-meta">High Court of Chhattisgarh &mdash; VC Hearing Records</p>
         </div>
         <span className="record-count">{total} total records</span>
       </div>
