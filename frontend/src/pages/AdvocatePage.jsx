@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../lib/api.js';
 
 const COURT_HALLS = [
   { value: 'Court No', label: "Hon'ble The CJ's Court" },
@@ -35,18 +35,15 @@ const AdvocatePage = () => {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState({ date: '', case_no: '', court_hall_no: '' });
 
-  useEffect(() => { fetchAdvocates(page); }, [page]);
-  useEffect(() => { fetchAdvocates(1); setPage(1); }, [search]);
-
-  const fetchAdvocates = async (currentPage = 1) => {
+  const fetchAdvocates = useCallback(async (currentPage = 1) => {
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams({
         page: currentPage, limit,
-        ...Object.fromEntries(Object.entries(search).filter(([_, v]) => v))
+        ...Object.fromEntries(Object.entries(search).filter((entry) => entry[1]))
       });
-      const res = await axios.get(`http://localhost:5000/advocates/getAll?${params}`);
+      const res = await api.get(`/advocates/getAll?${params}`);
       setAdvocates(res.data.advocates || []);
       setTotal(res.data.total || 0);
       setPage(res.data.page || currentPage);
@@ -55,10 +52,17 @@ const AdvocatePage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, search]);
+
+  useEffect(() => {
+    queueMicrotask(() => fetchAdvocates(page));
+  }, [fetchAdvocates, page]);
 
   const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSearchChange = e => setSearch({ ...search, [e.target.name]: e.target.value });
+  const handleSearchChange = e => {
+    setSearch({ ...search, [e.target.name]: e.target.value });
+    setPage(1);
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -68,7 +72,7 @@ const AdvocatePage = () => {
     Object.entries(formData).forEach(([k, v]) => data.append(k, v));
     data.append('uploaded_file', selectedFile);
     try {
-      await axios.post('http://localhost:5000/advocates/upload', data);
+      await api.post('/advocates/upload', data);
       setSubmitMsg('success');
       setFormData(emptyForm);
       setSelectedFile(null);
@@ -88,7 +92,7 @@ const AdvocatePage = () => {
     setBulkLoading(true);
     setBulkMessage('');
     try {
-      const res = await axios.post('http://localhost:5000/advocates/bulk-upload', data, {
+      const res = await api.post('/advocates/bulk-upload', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setBulkMessage({ type: 'success', text: res.data.message || 'Records imported successfully.' });

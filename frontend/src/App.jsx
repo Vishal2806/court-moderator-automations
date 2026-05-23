@@ -1,17 +1,13 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import AdvocatePage from './pages/AdvocatePage';
 import VictimPage from './pages/VictimPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import ErrorBoundary from './components/ErrorBoundary';
-import { AuthProvider, useAuth } from './auth/AuthProvider.jsx';
+import { AuthProvider } from './auth/AuthProvider.jsx';
+import { useAuth } from './auth/AuthContext.js';
+import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import './index.css';
-
-const RequireAuth = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
-};
 
 const App = () => {
   return (
@@ -26,22 +22,29 @@ const App = () => {
           <main className="main-content">
             <ErrorBoundary>
               <Routes>
-                <Route path="/" element={<HomePage />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <HomePage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/login" element={<LoginPage />} />
                 <Route
                   path="/advocate"
                   element={
-                    <RequireAuth>
+                    <ProtectedRoute>
                       <AdvocatePage />
-                    </RequireAuth>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/victim"
                   element={
-                    <RequireAuth>
+                    <ProtectedRoute>
                       <VictimPage />
-                    </RequireAuth>
+                    </ProtectedRoute>
                   }
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -64,9 +67,11 @@ const NavigationLinks = () => {
   return (
     <ul className="nav-links">
       <li>
-        <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>
-          Home
-        </NavLink>
+        {isAuthenticated && (
+          <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>
+            Home
+          </NavLink>
+        )}
       </li>
       {isAuthenticated && (
         <>

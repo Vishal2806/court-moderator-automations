@@ -3,59 +3,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "court-auth-secret";
-const JWT_EXPIRES = "8h";
-
-export const register = async (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({
-      success: false,
-      error: "Username and password are required",
-    });
-  }
-
-  try {
-    const existingUser = await pool.query(
-      "SELECT id FROM users WHERE username = $1",
-      [username]
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: "Username already exists",
-      });
-    }
-
-    const password_hash = bcrypt.hashSync(password, 10);
-
-    const result = await pool.query(
-      "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username",
-      [username, password_hash]
-    );
-
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      user: result.rows[0],
-    });
-  } catch (error) {
-    console.error(error);
-
-    if (error.code === "23505") {
-      return res.status(400).json({
-        success: false,
-        error: "Username already exists",
-      });
-    }
-
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
+const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || "8h";
 
 export const login = async (req, res) => {
-  const { username, password } = req.body;
+  const username = req.body.username?.trim();
+  const { password } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({
@@ -66,13 +18,16 @@ export const login = async (req, res) => {
 
   try {
     const userResult = await pool.query(
-      "SELECT id, username, password_hash FROM users WHERE username = $1",
+      "SELECT id, username, password, role FROM users WHERE username = $1",
       [username]
     );
 
     const user = userResult.rows[0];
 
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    const passwordMatches =
+      user?.password && (await bcrypt.compare(password, user.password));
+
+    if (!passwordMatches) {
       return res.status(401).json({
         success: false,
         error: "Invalid username or password",
@@ -80,20 +35,29 @@ export const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES }
     );
+
+    const authUser = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    };
 
     res.json({
       success: true,
       message: "Login successful",
       token,
-      user: { id: user.id, username: user.username },
+      user: authUser,
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({
+      success: false,
+      error: "Unable to login. Please try again later.",
+    });
   }
 };
 

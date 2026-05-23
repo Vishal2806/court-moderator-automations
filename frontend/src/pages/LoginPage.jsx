@@ -1,42 +1,30 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { useAuth } from "../auth/AuthProvider.jsx";
+import { useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext.js";
 
 const LoginPage = () => {
-  const { login } = useAuth();
+  const { isAuthenticated, login } = useAuth();
   const navigate = useNavigate();
-  const [isRegistering, setIsRegistering] = useState(false);
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleLogin = async (event) => {
     event.preventDefault();
-    setError(""); setSuccess(""); setLoading(true);
+    setError("");
+    setLoading(true);
+
     try {
       await login({ username, password });
-      navigate("/", { replace: true });
+      navigate(location.state?.from?.pathname || "/", { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Login failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (event) => {
-    event.preventDefault();
-    setError(""); setSuccess(""); setLoading(true);
-    try {
-      const response = await axios.post("http://localhost:5000/auth/register", { username, password });
-      setSuccess("Account created successfully. You may now log in.");
-      setIsRegistering(false);
-      // Keep username pre-filled for convenience, but clear password
-      setPassword("");
-    } catch (err) {
-      setError(err.response?.data?.error || err.message || "Registration failed.");
     } finally {
       setLoading(false);
     }
@@ -53,19 +41,14 @@ const LoginPage = () => {
 
         <div className="login-divider" />
 
-        <h2 className="login-heading">
-          {isRegistering ? "Create Account" : "Sign In"}
-        </h2>
+        <h2 className="login-heading">Sign In</h2>
         <p className="login-desc">
-          {isRegistering
-            ? "Register a new user account to access the registry."
-            : "Enter your credentials to continue."}
+          Enter your assigned credentials to continue.
         </p>
 
         {error && <div className="msg-bar error">{error}</div>}
-        {success && <div className="msg-bar success">{success}</div>}
 
-        <form onSubmit={isRegistering ? handleRegister : handleLogin} className="login-form" noValidate>
+        <form onSubmit={handleLogin} className="login-form" noValidate>
           <div className="field">
             <label>Username <span className="req">*</span></label>
             <input
@@ -84,27 +67,14 @@ const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
-              autoComplete={isRegistering ? "new-password" : "current-password"}
+              autoComplete="current-password"
               required
             />
           </div>
           <button type="submit" className="primary-btn login-submit" disabled={loading}>
-            {loading ? "Please wait…" : isRegistering ? "Create Account" : "Sign In"}
+            {loading ? "Please wait…" : "Sign In"}
           </button>
         </form>
-
-        <div className="login-switch">
-          {isRegistering ? "Already have an account?" : "Need an account?"}
-          {" "}
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => { setIsRegistering(!isRegistering); setError(""); setSuccess(""); }}
-          >
-            {isRegistering ? "Sign In" : "Register"}
-          </button>
-        </div>
-
       </div>
     </div>
   );

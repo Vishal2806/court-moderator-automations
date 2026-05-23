@@ -1,41 +1,61 @@
-import React, {
-  createContext,
-  useContext,
+import {
   useState,
   useEffect,
+  useCallback,
 } from "react";
-import axios from "axios";
+import { jwtDecode } from "jwt-decode";
+import { AuthContext } from "./AuthContext.js";
+import api, { AUTH_STORAGE_KEY, setAuthToken } from "../lib/api.js";
 
-const AuthContext = createContext();
-const STORAGE_KEY = "court-automation-auth";
+const isTokenExpired = (token) => {
+  try {
+    const decoded = jwtDecode(token);
+    return decoded.exp ? decoded.exp * 1000 <= Date.now() : false;
+  } catch {
+    return true;
+  }
+};
+
+const getTokenExpiryTime = (token) => {
+  try {
+    const decoded = jwtDecode(token);
+    return decoded.exp ? decoded.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+};
 
 const storedAuth = (() => {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
   } catch {
     return null;
   }
 })();
 
-if (storedAuth?.token) {
-  axios.defaults.headers.common.Authorization = `Bearer ${storedAuth.token}`;
+const initialAuth =
+  storedAuth?.token && !isTokenExpired(storedAuth.token) ? storedAuth : null;
+
+if (storedAuth?.token && !initialAuth) {
+  setAuthToken(null);
+  localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(storedAuth?.user || null);
-  const [token, setToken] = useState(storedAuth?.token || null);
+  const [user, setUser] = useState(initialAuth?.user || null);
+  const [token, setToken] = useState(initialAuth?.token || null);
 
   const login = async ({ username, password }) => {
-    const response = await axios.post("http://localhost:5000/auth/login", {
+    const response = await api.post("/auth/login", {
       username,
       password,
     });
 
     const { token: authToken, user: authUser } = response.data;
 
-    axios.defaults.headers.common.Authorization = `Bearer ${authToken}`;
+    setAuthToken(authToken);
     localStorage.setItem(
-      STORAGE_KEY,
+      AUTH_STORAGE_KEY,
       JSON.stringify({ token: authToken, user: authUser })
     );
 
@@ -45,19 +65,16 @@ export const AuthProvider = ({ children }) => {
     return authUser;
   };
 
-const logout = () => {
-  setUser(null);
-  setToken(null);
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
 
-  delete axios.defaults.headers.common.Authorization;
+    setAuthToken(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  }, []);
 
-  localStorage.removeItem(STORAGE_KEY);
-
-  window.location.href = "/login";
-};
-useEffect(() => {
-  const interceptor =
-    axios.interceptors.response.use(
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
@@ -68,12 +85,26 @@ useEffect(() => {
       }
     );
 
-  return () => {
-    axios.interceptors.response.eject(
-      interceptor
-    );
-  };
-}, []);
+    return () => {
+      api.interceptors.response.eject(interceptor);
+    };
+  }, [logout]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    const expiryTime = getTokenExpiryTime(token);
+
+    if (!expiryTime) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(logout, Math.max(expiryTime - Date.now(), 0));
+
+    return () => window.clearTimeout(timeout);
+  }, [token, logout]);
 
   const isAuthenticated = Boolean(user && token);
 
@@ -85,5 +116,3 @@ useEffect(() => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

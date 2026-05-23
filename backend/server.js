@@ -24,14 +24,73 @@ const ensureAuthTable = async () => {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username VARCHAR(255) NOT NULL,
-      password_hash TEXT NOT NULL,
+      password TEXT NOT NULL,
+      role VARCHAR(20) NOT NULL DEFAULT 'client',
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS password TEXT
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'client'
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+          AND column_name = 'password_hash'
+      ) THEN
+        UPDATE users
+        SET password = password_hash
+        WHERE password IS NULL;
+
+        ALTER TABLE users
+        ALTER COLUMN password_hash DROP NOT NULL;
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE password IS NULL
+      ) THEN
+        ALTER TABLE users
+        ALTER COLUMN password SET NOT NULL;
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_idx
     ON users (username)
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'users_role_check'
+      ) THEN
+        ALTER TABLE users
+        ADD CONSTRAINT users_role_check
+        CHECK (role IN ('admin', 'client'));
+      END IF;
+    END $$;
   `);
 };
 

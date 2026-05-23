@@ -530,21 +530,6 @@ body {
   width: 100%;
 }
 
-.login-switch {
-  margin-top: 1.2rem;
-  text-align: center;
-  font-size: 0.84rem;
-  color: var(--text-muted);
-}
-
-.link-btn {
-  background: transparent;
-  border: none;
-  color: var(--accent);
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: underline;
-}
 /* HOME PAGE */
 .home-page {
   width: 100%;
