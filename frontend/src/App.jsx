@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import AdvocatePage from './pages/AdvocatePage';
 import VictimPage from './pages/VictimPage';
 import HomePage from './pages/HomePage';
@@ -63,6 +63,8 @@ const App = () => {
 
 const NavigationLinks = () => {
   const { isAuthenticated, user, logout } = useAuth();
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/login';
 
   return (
     <ul className="nav-links">
@@ -92,11 +94,11 @@ const NavigationLinks = () => {
           <button type="button" className="nav-link logout-btn" onClick={logout}>
             Logout {user?.username ? `(${user.username})` : ''}
           </button>
-        ) : (
+        ) : !isLoginPage ? (
           <NavLink to="/login" className={({ isActive }) => isActive ? 'active' : ''}>
             Login
           </NavLink>
-        )}
+        ) : null}
       </li>
     </ul>
   );

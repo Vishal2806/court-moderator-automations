@@ -41,7 +41,7 @@ const LoginPage = () => {
 
         <div className="login-divider" />
 
-        <h2 className="login-heading">Sign In</h2>
+        <h2 className="login-heading">Login</h2>
         <p className="login-desc">
           Enter your assigned credentials to continue.
         </p>
@@ -72,7 +72,7 @@ const LoginPage = () => {
             />
           </div>
           <button type="submit" className="primary-btn login-submit" disabled={loading}>
-            {loading ? "Please wait…" : "Sign In"}
+            {loading ? "Please wait…" : "Login"}
           </button>
         </form>
       </div>
