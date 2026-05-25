@@ -89,17 +89,19 @@ const NavigationLinks = () => {
           </li>
         </>
       )}
-      <li>
-        {isAuthenticated ? (
+      {isAuthenticated ? (
+        <li>
           <button type="button" className="nav-link logout-btn" onClick={logout}>
             Logout {user?.username ? `(${user.username})` : ''}
           </button>
-        ) : !isLoginPage ? (
+        </li>
+      ) : !isLoginPage ? (
+        <li>
           <NavLink to="/login" className={({ isActive }) => isActive ? 'active' : ''}>
             Login
           </NavLink>
-        ) : null}
-      </li>
+        </li>
+      ) : null}
     </ul>
   );
 };

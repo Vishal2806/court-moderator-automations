@@ -319,18 +319,6 @@ export const bulkUploadAdvocates = async (req, res) => {
         "Remarks",
       ]);
 
-      // Debug Logs
-      console.log("Processing Row:", row);
-
-      console.log({
-        hearing_date_value,
-        case_no_value,
-        court_hall_no_value,
-        petitioner_name_value,
-        counsel_name_value,
-        technical_person_value,
-      });
-
       // Skip Missing Required Fields
       if (
         !case_no_value ||

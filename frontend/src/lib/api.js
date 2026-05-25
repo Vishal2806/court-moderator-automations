@@ -1,9 +1,10 @@
 import axios from "axios";
 
 export const AUTH_STORAGE_KEY = "court-automation-auth";
+const apiBaseURL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:5000" : "");
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: apiBaseURL,
 });
 
 export const setAuthToken = (token) => {

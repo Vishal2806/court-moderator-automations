@@ -117,7 +117,7 @@ export const uploadVictim = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
-    console.log(error.message);
+    console.error(error);
 
     res.status(500).json({
       success: false,
@@ -360,8 +360,6 @@ export const bulkUploadVictims = async (req, res) => {
       ]),
     };
 
-    console.log("Detected Indexes:", indexes);
-
     // ==========================
     // Get Max Serial
     // ==========================
@@ -466,15 +464,6 @@ export const bulkUploadVictims = async (req, res) => {
         const remarks_value =
           row[indexes.remarks];
 
-        console.log({
-          hearing_date_value,
-          case_no_value,
-          court_hall_no_value,
-          party_name_value,
-          counsel_name_value,
-          technical_person_value,
-        });
-
         // ==========================
         // Skip Invalid Rows
         // ==========================
@@ -537,7 +526,7 @@ export const bulkUploadVictims = async (req, res) => {
 
       } catch (err) {
 
-        console.log(err);
+        console.error(err);
 
         skipped.push({
           row: index + 1,
@@ -558,7 +547,7 @@ export const bulkUploadVictims = async (req, res) => {
 
   } catch (error) {
 
-    console.log(error);
+    console.error(error);
 
     res.status(500).json({
       success: false,

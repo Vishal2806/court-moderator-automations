@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 
 import pool from "./config/db.js";
@@ -12,12 +13,20 @@ import authMiddleware from "./middleware/auth.middleware.js";
 dotenv.config();
 
 const app = express();
-
-app.use(cors());
-app.use(express.json());
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
 const PORT = process.env.PORT || 5000;
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+app.use(cors({
+  origin: allowedOrigins.length > 0 ? allowedOrigins : process.env.NODE_ENV !== "production",
+}));
+app.use(express.json());
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 const ensureAuthTable = async () => {
   await pool.query(`
@@ -94,18 +103,17 @@ const ensureAuthTable = async () => {
   `);
 };
 
-app.get("/test-db", async (req, res) => {
+app.get("/health", async (req, res) => {
   try {
-    const result = await pool.query("SELECT NOW()");
+    await pool.query("SELECT 1");
 
     res.json({
       success: true,
-      message: "Database Connected Successfully",
-      time: result.rows[0],
+      message: "OK",
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error(error);
+    res.status(500).json({ success: false, error: "Health check failed" });
   }
 });
 
@@ -117,7 +125,7 @@ const startServer = async () => {
   try {
     await ensureAuthTable();
     app.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
+      console.info(`Server running on port ${PORT}`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
